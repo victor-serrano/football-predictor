@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Predictor — AI & Math Odds</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --accent-green: #10b981;
+            --accent-neon: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 1000px; width: 100%; }
+
+        header { text-align: center; margin-bottom: 30px; }
+        header h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-green), var(--accent-neon)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 5px; }
+
+        .search-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); margin-bottom: 30px; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        
+        .input-group { position: relative; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-group input, .input-group select { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 10px; color: #fff; font-size: 1rem; outline: none; transition: border 0.2s; }
+        .input-group input:focus, .input-group select:focus { border-color: var(--accent-green); }
+
+        /* Autocompletado */
+        .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; border: 1px solid var(--border-color); border-radius: 10px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; }
+        .suggestions div { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #334155; }
+        .suggestions div:hover { background: var(--accent-green); color: #000; font-weight: 600; }
+
+        .btn-predict { width: 100%; padding: 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+        .btn-predict:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Panel de Resultados */
+        .results-panel { display: none; }
+        .match-header { background: var(--card-bg); border-radius: 16px; padding: 25px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; text-align: center; margin-bottom: 25px; }
+        .team-box h2 { font-size: 1.5rem; font-weight: 800; }
+        .lambda-badge { display: inline-block; background: #0f172a; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; color: var(--accent-neon); margin-top: 5px; border: 1px solid var(--border-color); }
+        .vs-circle { background: var(--accent-green); color: #000; font-weight: 800; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+
+        /* Barras 1X2 */
+        .odds-card { background: var(--card-bg); border-radius: 16px; padding: 25px; border: 1px solid var(--border-color); margin-bottom: 25px; }
+        .odds-card h3 { font-size: 1.1rem; margin-bottom: 15px; color: var(--text-muted); text-transform: uppercase; font-size: 0.85rem; }
+        
+        .bar-container { display: flex; height: 45px; border-radius: 10px; overflow: hidden; background: #0f172a; margin-bottom: 15px; font-weight: 700; }
+        .bar-1 { background: var(--accent-green); color: #000; display: flex; align-items: center; justify-content: center; transition: width 0.5s; }
+        .bar-x { background: #64748b; color: #fff; display: flex; align-items: center; justify-content: center; transition: width 0.5s; }
+        .bar-2 { background: var(--accent-neon); color: #000; display: flex; align-items: center; justify-content: center; transition: width 0.5s; }
+
+        /* Grid de Mercados */
+        .grid-markets { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .market-box { background: #0f172a; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; }
+        .market-box h4 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+        .val-big { font-size: 1.6rem; font-weight: 800; color: var(--text-main); }
+
+        /* Forma Reciente */
+        .badge-racha { display: inline-block; width: 24px; height: 24px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 24px; margin: 0 2px; }
+        .racha-V { background: var(--accent-green); color: #000; }
+        .racha-E { background: #64748b; color: #fff; }
+        .racha-D { background: #ef4444; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>FOOTBALL PREDICTOR</h1>
+            <p>Análisis Estadístico Avanzado & Probabilidades Poisson</p>
+        </header>
+        
+        <div class="search-card">
+            <div class="grid-inputs">
+                <div class="input-group">
+                    <label>Equipo Local</label>
+                    <input type="text" id="local" placeholder="Escribe para buscar..." autocomplete="off">
+                    <div id="sug-local" class="suggestions"></div>
+                </div>
+                <div class="input-group">
+                    <label>Equipo Visitante</label>
+                    <input type="text" id="visitante" placeholder="Escribe para buscar..." autocomplete="off">
+                    <div id="sug-visitante" class="suggestions"></div>
+                </div>
+            </div>
+
+            <div class="grid-inputs">
+                <div class="input-group">
+                    <label>Competición</label>
+                    <select id="competicion">
+                        <option value="Todas">Todas las Competiciones</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Fecha Corte (Opcional)</label>
+                    <input type="date" id="fecha_corte">
+                </div>
+            </div>
+
+            <button class="btn-predict" onclick="realizarPrediccion()">CALCULAR PROBABILIDADES</button>
+        </div>
+
+        <!-- GENERADOR DE APUESTAS DE LA JORNADA (+EV) -->
+        <div style="text-align: center; margin: 20px 0;">
+            <button onclick="generarCombinadaJornada()" style="padding: 12px 24px; background: linear-gradient(135deg, #10b981, #059669); color: #000; border: none; border-radius: 8px; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                🚀 GENERAR MEJORES APUESTAS DE LA JORNADA (+EV)
+            </button>
+        </div>
+
+        <div id="panel-combinada" class="search-card" style="display: none; border: 2px solid var(--accent-neon); margin-bottom: 25px;">
+            <h3 style="color: var(--accent-neon); margin-bottom: 10px;">📊 Selecciones Destacadas de la Jornada</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                Pronósticos con mayor solidez estadística detectados en la base de datos.
+            </p>
+            <div id="lista-combinada" style="display: grid; gap: 10px;"></div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; font-weight: 700;">
+                <div>Probabilidad Combinada Total: <span id="comb-prob" style="color: var(--accent-green);">0%</span></div>
+                <div>Cuota Implícita Justa: <span id="comb-cuota" style="color: #fff;">1.00</span></div>
+            </div>
+        </div>
+
+        <!-- PANEL DE RESULTADOS Y PRONÓSTICOS INDIVIDUALES -->
+        <div id="results" class="results-panel">
+            <!-- Tarjeta de Recomendación Principal & Calculadora +EV / Kelly -->
+            <div id="rec-card" class="search-card" style="border: 2px solid var(--accent-green); text-align: center; margin-bottom: 20px;">
+                <h4 style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">💡 Pronóstico Recomendado por el Modelo</h4>
+                <div id="rec-mercado" style="font-size: 1.8rem; font-weight: 800; color: #fff; margin: 10px 0;">-</div>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <span id="rec-prob" style="font-size: 1.2rem; font-weight: 700; color: var(--accent-green);">0% Probabilidad</span>
+                    <span id="rec-badge" style="padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; background: #0f172a;">-</span>
+                </div>
+
+                <!-- Calculadora de Cuota & Kelly -->
+                <div style="background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); margin-top: 10px;">
+                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Introduce la Cuota de la Casa para este mercado:</label>
+                    <div style="display: flex; justify-content: center; gap: 10px; max-width: 320px; margin: 0 auto;">
+                        <input type="number" id="cuota_input" step="0.01" placeholder="Ej. 1.85" style="width: 130px; text-align: center; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: #1e293b; color: #fff; font-weight: 700;">
+                        <button onclick="realizarPrediccion()" style="padding: 8px 16px; background: var(--accent-neon); border: none; border-radius: 6px; font-weight: 700; color: #000; cursor: pointer;">Calcular EV</button>
+                    </div>
+                    <div id="ev-result" style="margin-top: 12px; display: none;">
+                        <div id="ev-badge" style="font-size: 1.1rem; font-weight: 800; margin-bottom: 4px;">-</div>
+                        <div id="kelly-badge" style="font-size: 0.85rem; color: var(--text-muted);">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="match-header">
+                <div class="team-box">
+                    <h2 id="name-local">Local</h2>
+                    <span class="lambda-badge">Gol Exp (λ): <b id="lambda-local">0.00</b></span>
+                    <div id="racha-local" style="margin-top:8px;"></div>
+                </div>
+                <div class="vs-circle">VS</div>
+                <div class="team-box">
+                    <h2 id="name-vis">Visitante</h2>
+                    <span class="lambda-badge">Gol Exp (λ): <b id="lambda-vis">0.00</b></span>
+                    <div id="racha-vis" style="margin-top:8px;"></div>
+                </div>
+            </div>
+
+            <div class="odds-card">
+                <h3>Mercado 1X2 (Resultado Final)</h3>
+                <div class="bar-container">
+                    <div id="bar-1" class="bar-1">0%</div>
+                    <div id="bar-x" class="bar-x">0%</div>
+                    <div id="bar-2" class="bar-2">0%</div>
+                </div>
+            </div>
+
+            <div class="grid-markets">
+                <div class="odds-card">
+                    <h3>Más / Menos de 2.5 Goles</h3>
+                    <div style="display:flex; justify-content:space-around; margin-top:10px;">
+                        <div class="market-box"><div class="val-big" id="over25">0%</div><h4>+2.5 Goles</h4></div>
+                        <div class="market-box"><div class="val-big" id="under25">0%</div><h4>-2.5 Goles</h4></div>
+                    </div>
+                </div>
+                <div class="odds-card">
+                    <h3>Ambos Equipos Marcan (BTTS)</h3>
+                    <div style="display:flex; justify-content:space-around; margin-top:10px;">
+                        <div class="market-box"><div class="val-big" id="btts-yes">0%</div><h4>SÍ</h4></div>
+                        <div class="market-box"><div class="val-big" id="btts-no">0%</div><h4>NO</h4></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MATRIZ / TOP 5 MARCADORES EXACTOS -->
+            <div class="odds-card" style="margin-top: 20px;">
+                <h3>🎯 Marcadores Exactos Más Probables (Top 5)</h3>
+                <div id="grid-marcadores" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-top: 15px;">
+                    <!-- Se llena dinámicamente con JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+<script>
+    let listaEquipos = [];
+
+    // Cargar equipos y competiciones.
+    async function cargarConfiguracion() {
+        try {
+            const res = await fetch('/api/config');
+            if (!res.ok) throw new Error('No se pudo cargar la configuración');
+
+            const data = await res.json();
+            listaEquipos = Array.isArray(data.equipos) ? data.equipos : [];
+
+            const compSelect = document.getElementById('competicion');
+            (data.competiciones || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                compSelect.appendChild(opt);
+            });
+
+            configurarBuscador('local', 'sug-local');
+            configurarBuscador('visitante', 'sug-visitante');
+        } catch (error) {
+            console.error('Error cargando configuración:', error);
+            alert('No se pudieron cargar los equipos. Comprueba que el servidor está iniciado.');
+        }
+    }
+
+    function configurarBuscador(inputId, sugId) {
+        const input = document.getElementById(inputId);
+        const sug = document.getElementById(sugId);
+
+        input.addEventListener('input', () => {
+            const val = input.value.toLowerCase().trim();
+            sug.innerHTML = '';
+
+            if (!val) {
+                sug.style.display = 'none';
+                return;
+            }
+
+            const filtrados = listaEquipos
+                .filter(e => e.toLowerCase().includes(val))
+                .slice(0, 8);
+
+            if (!filtrados.length) {
+                sug.style.display = 'none';
+                return;
+            }
+
+            filtrados.forEach(e => {
+                const div = document.createElement('div');
+                div.textContent = e;
+
+                div.onclick = () => {
+                    input.value = e;
+                    sug.style.display = 'none';
+                };
+
+                sug.appendChild(div);
+            });
+
+            sug.style.display = 'block';
+        });
+
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                sug.style.display = 'none';
+            }, 150);
+        });
+    }
+
+    function renderRacha(rachaStr, containerId) {
+        const cont = document.getElementById(containerId);
+        cont.innerHTML = '';
+
+        if (!rachaStr) return;
+
+        for (const char of rachaStr) {
+            if (!['V', 'E', 'D'].includes(char)) continue;
+
+            const span = document.createElement('span');
+            span.className = `badge-racha racha-${char}`;
+            span.textContent = char;
+            cont.appendChild(span);
+        }
+    }
+
+    function renderMarcadores(marcadores) {
+        const grid = document.getElementById('grid-marcadores');
+        grid.innerHTML = '';
+
+        if (!Array.isArray(marcadores) || marcadores.length === 0) {
+            grid.textContent = 'No hay marcadores disponibles.';
+            return;
+        }
+
+        marcadores.forEach((item, index) => {
+            const tarjeta = document.createElement('div');
+            tarjeta.style.cssText = `
+                background: #0f172a;
+                border: 1px solid ${index === 0 ? '#10b981' : '#334155'};
+                border-radius: 12px;
+                padding: 16px 8px;
+                text-align: center;
+            `;
+
+            const marcador = document.createElement('div');
+            marcador.textContent = item.marcador ??
+                `${item.goles_local} - ${item.goles_visitante}`;
+            marcador.style.cssText = `
+                font-size: 1.5rem;
+                font-weight: 800;
+                color: ${index === 0 ? '#10b981' : '#f8fafc'};
+            `;
+
+            const probabilidad = document.createElement('div');
+            probabilidad.textContent = `${item.probabilidad_pct}%`;
+            probabilidad.style.cssText = `
+                color: #94a3b8;
+                font-size: 0.9rem;
+                margin-top: 6px;
+            `;
+
+            tarjeta.appendChild(marcador);
+            tarjeta.appendChild(probabilidad);
+            grid.appendChild(tarjeta);
+        });
+    }
+
+    async function realizarPrediccion() {
+        const loc = document.getElementById('local').value.trim();
+        const vis = document.getElementById('visitante').value.trim();
+        const comp = document.getElementById('competicion').value;
+        const fecha = document.getElementById('fecha_corte').value;
+        const cuota = document.getElementById('cuota_input')?.value || '';
+
+        if (!loc || !vis) {
+            alert('Por favor, selecciona ambos equipos.');
+            return;
+        }
+
+        if (loc.toLowerCase() === vis.toLowerCase()) {
+            alert('El equipo local y el visitante deben ser distintos.');
+            return;
+        }
+
+        const params = new URLSearchParams({
+            local: loc,
+            visitante: vis,
+            competicion: comp,
+            fecha_corte: fecha,
+            cuota: cuota
+        });
+
+        try {
+            const res = await fetch(`/api/prediccion?${params.toString()}`);
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+                alert(data.error || 'No se pudo calcular la predicción.');
+                return;
+            }
+
+            // Recomendación y evaluación de cuota.
+            if (data.recomendacion) {
+                const rec = data.recomendacion;
+
+                document.getElementById('rec-mercado').textContent =
+                    rec.mercado_recomendado ?? '-';
+                document.getElementById('rec-prob').textContent =
+                    `${rec.probabilidad_pct}% Probabilidad Estimada`;
+
+                const badge = document.getElementById('rec-badge');
+                badge.textContent = rec.nivel_confianza ?? '-';
+
+                if (rec.color_codigo === 'green') {
+                    badge.style.background = '#10b981';
+                    badge.style.color = '#000';
+                } else if (rec.color_codigo === 'yellow') {
+                    badge.style.background = '#eab308';
+                    badge.style.color = '#000';
+                } else {
+                    badge.style.background = '#ef4444';
+                    badge.style.color = '#fff';
+                }
+
+                const evDiv = document.getElementById('ev-result');
+
+                if (rec.evaluacion_cuota) {
+                    const ev = rec.evaluacion_cuota;
+
+                    document.getElementById('ev-badge').textContent =
+                        ev.tiene_valor
+                            ? `Valor esperado positivo (${ev.ev_pct}% EV)`
+                            : `Sin valor esperado positivo (${ev.ev_pct}% EV)`;
+
+                    document.getElementById('ev-badge').style.color =
+                        ev.tiene_valor ? '#10b981' : '#ef4444';
+
+                    document.getElementById('kelly-badge').textContent =
+                        ev.tiene_valor
+                            ? `Kelly fraccional: ${ev.stake_kelly_pct}% del bankroll (estimación teórica)`
+                            : `La cuota introducida no ofrece valor esperado positivo según el modelo.`;
+
+                    evDiv.style.display = 'block';
+                } else {
+                    evDiv.style.display = 'none';
+                }
+            }
+
+            // Equipos y goles esperados.
+            document.getElementById('name-local').textContent = data.equipo_local;
+            document.getElementById('name-vis').textContent = data.equipo_visitante;
+            document.getElementById('lambda-local').textContent = data.lambda_local;
+            document.getElementById('lambda-vis').textContent = data.lambda_visitante;
+
+            // Mercado 1X2.
+            const m = data.mercados;
+            const p1 = (m.local * 100).toFixed(1);
+            const px = (m.empate * 100).toFixed(1);
+            const p2 = (m.visitante * 100).toFixed(1);
+
+            const b1 = document.getElementById('bar-1');
+            const bx = document.getElementById('bar-x');
+            const b2 = document.getElementById('bar-2');
+
+            b1.style.width = `${p1}%`;
+            b1.textContent = `1 (${p1}%)`;
+
+            bx.style.width = `${px}%`;
+            bx.textContent = `X (${px}%)`;
+
+            b2.style.width = `${p2}%`;
+            b2.textContent = `2 (${p2}%)`;
+
+            // Over/Under y ambos marcan.
+            document.getElementById('over25').textContent =
+                `${(m.over25 * 100).toFixed(1)}%`;
+            document.getElementById('under25').textContent =
+                `${(m.under25 * 100).toFixed(1)}%`;
+            document.getElementById('btts-yes').textContent =
+                `${(m.btts * 100).toFixed(1)}%`;
+            document.getElementById('btts-no').textContent =
+                `${((1 - m.btts) * 100).toFixed(1)}%`;
+
+            // Forma reciente.
+            renderRacha(
+                data.stats_local_detallada?.racha_ultimos_5,
+                'racha-local'
+            );
+            renderRacha(
+                data.stats_visitante_detallada?.racha_ultimos_5,
+                'racha-vis'
+            );
+
+            // TOP 5: esta propiedad la genera prediccion.py.
+            renderMarcadores(data.top_marcadores);
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('results').scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+        } catch (error) {
+            console.error('Error realizando predicción:', error);
+            alert('Error de conexión al calcular el partido. Comprueba el servidor.');
+        }
+    }
+
+    async function generarCombinadaJornada() {
+        const panel = document.getElementById('panel-combinada');
+        const lista = document.getElementById('lista-combinada');
+
+        panel.style.display = 'block';
+        lista.innerHTML = '';
+
+        const mensaje = document.createElement('p');
+        mensaje.textContent = 'Analizando los partidos disponibles...';
+        mensaje.style.color = '#94a3b8';
+        lista.appendChild(mensaje);
+
+        const comp = document.getElementById('competicion').value;
+        const params = new URLSearchParams({
+            competicion: comp,
+            limite: '5',
+            min_probabilidad: '60'
+        });
+
+        try {
+            const res = await fetch(`/api/combinada?${params.toString()}`);
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'No se pudieron obtener las selecciones.');
+            }
+
+            lista.innerHTML = '';
+
+            const selecciones = Array.isArray(data.selecciones)
+                ? data.selecciones
+                : [];
+
+            if (selecciones.length === 0) {
+                const vacio = document.createElement('p');
+                vacio.textContent =
+                    'No se encontraron selecciones que superen el umbral de probabilidad.';
+                vacio.style.color = '#94a3b8';
+                lista.appendChild(vacio);
+            } else {
+                selecciones.forEach((sel, index) => {
+                    const tarjeta = document.createElement('div');
+                    tarjeta.style.cssText = `
+                        background: #0f172a;
+                        border: 1px solid #334155;
+                        border-radius: 10px;
+                        padding: 14px;
+                        display: grid;
+                        gap: 6px;
+                    `;
+
+                    const partido = document.createElement('strong');
+                    partido.textContent =
+                        `${sel.equipo_local} vs ${sel.equipo_visitante}`;
+
+                    const mercado = document.createElement('span');
+                    mercado.textContent =
+                        `Pronóstico: ${sel.mercado_recomendado}`;
+
+                    const detalle = document.createElement('span');
+                    detalle.style.color = '#94a3b8';
+                    detalle.style.fontSize = '0.9rem';
+                    detalle.textContent =
+                        `Probabilidad estimada: ${sel.probabilidad_pct}% · Confianza: ${sel.nivel_confianza}`;
+
+                    tarjeta.append(partido, mercado, detalle);
+                    lista.appendChild(tarjeta);
+                });
+            }
+
+            document.getElementById('comb-prob').textContent =
+                `${data.probabilidad_combinada_pct ?? 0}%`;
+            document.getElementById('comb-cuota').textContent =
+                data.cuota_teorica_combinada ?? '—';
+
+            panel.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+        } catch (error) {
+            console.error('Error generando combinada:', error);
+            lista.innerHTML = '';
+
+            const aviso = document.createElement('p');
+            aviso.textContent = error.message ||
+                'No se pudieron cargar las selecciones.';
+            aviso.style.color = '#ef4444';
+            lista.appendChild(aviso);
+        }
+    }
+
+    cargarConfiguracion();
+</script>
+</body>
+</html>
